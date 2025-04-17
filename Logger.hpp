@@ -79,6 +79,14 @@ std::string formatMessageConsole(LogLevel level, const std::string& message, con
     return ss.str();
 }
 
+std::string timeToString(const unsigned long long& time, const std::string& format){
+    std::time_t t = static_cast<std::time_t>(time);
+    std::tm tm = *std::localtime(&t);
+    char buffer[80];
+    std::strftime(buffer, sizeof(buffer), format.c_str(), &tm);
+    return std::string(buffer);
+}
+
 /*
 * 日志类
 * 用于日志的输出
@@ -118,8 +126,13 @@ class Logger{
             std::lock_guard<std::mutex> lock(__mutex);
             __file = file;
             __file_path = file_path;
-            if (__file && __file_path != "")
+            if (__file && __file_path != ""){
+                __file_path = __file_path.find_last_not_of('.') == std::string::npos 
+                ? __file_path + "-" + timeToString(std::time(nullptr), "%Y%m%d") + ".log"
+                : __file_path.substr(0, __file_path.find_last_of('.')) + "-" +  timeToString(std::time(nullptr), "%Y%m%d") + ".log";
                 __file_stream.open(__file_path, std::ios::out | std::ios::app);
+            }
+
         }
         // 记录日志
         // 传入日志级别，日志内容，文件名，行号
@@ -128,32 +141,21 @@ class Logger{
             if (__console) {
                 std::cout << formatMessageConsole(level, message, file, line) << std::endl;
             }
-            
             if (__file) {
-                checkFileRollover();
+                // 每天自动将日志保存到新的文件中
+                if (std::time(nullptr) - __time > 60*60*24) {
+                    __file_stream.close();
+                    __time = std::time(nullptr);
+                }
                 if (!__file_stream.is_open()) {
+                    __file_path = __file_path.find_last_not_of('-') == std::string::npos 
+                                ? __file_path + "-" + timeToString(std::time(nullptr), "%Y%m%d") + ".log"
+                                : __file_path.substr(0, __file_path.find_last_of('-')) + "-" +  timeToString(std::time(nullptr), "%Y%m%d") + ".log";
                     __file_stream.open(__file_path, std::ios::app);
                 }
                 if (__file_stream.good()) {
                     __file_stream << formatMessage(level, message, file, line) << std::endl;
                 }
-            }
-        }
-        // 检查文件是否需要滚动
-        void checkFileRollover(){
-            if (!__file) return;
-            if (__file_path == "") return;
-            if (!__file_stream.is_open()) {
-                __file_stream.open(__file_path, std::ios::out | std::ios::app);
-            }
-            std::ifstream in(__file_path, std::ios::ate | std::ios::binary);
-            if (in.good() && in.tellg() > 10 * 1024 * 1024) { // 10MB
-                __file_stream.close();
-                size_t lastDot = __file_path.find_last_of('$');
-                std::string baseName = (lastDot == std::string::npos) ? __file_path : __file_path.substr(0, lastDot);
-                std::string newName = baseName + "$" + getCurrentTime() + ".log";
-                std::rename(__file_path.c_str(), newName.c_str());
-                __file_stream.open(__file_path, std::ios::app);
             }
         }
     
@@ -177,6 +179,8 @@ class Logger{
         std::string __file_path = "./app.log";
         // 文件流
         std::ofstream __file_stream;
+        // 时间记录
+        unsigned long long __time = std::time(nullptr);
         // 构造函数
         // 私有化构造函数，禁止外部创建对象
         // 使用单例模式
