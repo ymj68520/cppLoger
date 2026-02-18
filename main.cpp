@@ -32,10 +32,14 @@ int main(void) {
     bool flag = true;
     void* ptr = &value;
 
-    Logger::info() << "整数: " << value << "\n"
-                  << ", 浮点: " << pi   << "\n"
-                  << ", 布尔: " << flag << "\n"
-                  << ", 指针: " << ptr  << "\n";
+    Logger::info() << "整数: " << value << ::endl
+                  << ", 浮点: " << pi   << ::flush
+                  << ", 布尔: " << flag << Logger::endl
+                  << ", 指针: " << ptr  << Logger::flush;
 
+
+    lg::info << "使用命名空间别名输出日志" << lg::endl;
+    log_warning("这是函数风格的日志输出，值: ", value);
+    
     return 0;
 }

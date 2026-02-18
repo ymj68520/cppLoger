@@ -474,4 +474,90 @@ inline LogStream Logger::fatal(const std::source_location& loc) {
     return stream;
 }
 
+/**
+ * @brief 日志快捷宏
+ * @details 提供更简洁的日志调用方式
+ *          使用方式：LOG_DEBUG << "message" 或 lg::info << "message"
+ *          也可以直接使用函数风格：log_debug("message"，42, true)
+ */
+
+// 宏定义（兼容旧版本）
+#ifndef LOGGER_NO_MACROS
+    #define LOG_DEBUG   Logger::debug()
+    #define LOG_INFO    Logger::info()
+    #define LOG_WARNING Logger::warning()
+    #define LOG_ERROR   Logger::error()
+    #define LOG_FATAL   Logger::fatal()
+    #define LOG_ENDL    Logger::endl
+#endif
+
+// 命名空间别名 - 使用代理模式支持 lg::info << "message" 语法，这会导致source_location
+namespace lg {
+    // 日志级别标记类型
+    struct DebugTag { constexpr DebugTag() = default; };
+    struct InfoTag { constexpr InfoTag() = default; };
+    struct WarningTag { constexpr WarningTag() = default; };
+    struct ErrorTag { constexpr ErrorTag() = default; };
+    struct FatalTag { constexpr FatalTag() = default; };
+
+    // 日志代理 - 首次使用 operator<< 时创建 LogStream
+    template<LogLevel Level>
+    class LogProxy {
+    public:
+        constexpr LogProxy() = default;
+
+        // 创建并返回 LogStream，支持链式调用
+        template<typename T>
+        LogStream operator<<(const T& val) const {
+            auto loc = std::source_location::current();
+            LogStream stream(Level, loc.file_name(), loc.line());
+            stream << val;
+            return stream;
+        }
+    };
+
+    // 全局代理实例
+    inline LogProxy<LogLevel::DEBUG> debug;
+    inline LogProxy<LogLevel::INFO> info;
+    inline LogProxy<LogLevel::WARNING> warning;
+    inline LogProxy<LogLevel::ERROR> error;
+    inline LogProxy<LogLevel::ERROR> fatal;
+
+    // 便捷常量
+    constexpr StdManipulator endl{StdManipulator::Endl};
+    constexpr StdManipulator flush{StdManipulator::Flush};
+}
+
+// 同时提供 logger 命名空间
+namespace logger {
+    using namespace lg;
+}
+
+// C++20 概念约束的简化版本
+// 支持函数风格的调用：log_debug("message")
+template<typename... Args>
+void log_debug(Args&&... args) {
+    (Logger::debug() << ... << std::forward<Args>(args));
+}
+
+template<typename... Args>
+void log_info(Args&&... args) {
+    (Logger::info() << ... << std::forward<Args>(args));
+}
+
+template<typename... Args>
+void log_warning(Args&&... args) {
+    (Logger::warning() << ... << std::forward<Args>(args));
+}
+
+template<typename... Args>
+void log_error(Args&&... args) {
+    (Logger::error() << ... << std::forward<Args>(args));
+}
+
+template<typename... Args>
+void log_fatal(Args&&... args) {
+    (Logger::fatal() << ... << std::forward<Args>(args));
+}
+
 #endif // C_LOGGER_HPP

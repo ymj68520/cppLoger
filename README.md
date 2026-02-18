@@ -105,8 +105,10 @@ Logger::getInstance().setFile(false, "");         // 禁用
 
 ### 日志输出
 
+#### 标准用法
+
 ```cpp
-// 流式接口（推荐）
+// 流式接口
 Logger::debug() << "调试信息: " << 42;
 Logger::info() << "状态: " << "OK";
 Logger::warning() << "警告: " << "内存不足";
@@ -126,9 +128,30 @@ Logger::info() << "整数: " << value
 // 支持换行符操纵符
 Logger::info() << "第一行" << Logger::endl
               << "第二行" << Logger::endl;
+```
 
-// 或者使用全局版本
-Logger::info() << "消息" << ::endl;
+#### 便捷调用方式
+
+```cpp
+// 方式一：使用宏（与原版兼容）
+LOG_DEBUG << "调试信息";
+LOG_INFO << "一般信息";
+LOG_WARNING << "警告信息";
+LOG_ERROR << "错误信息";
+LOG_FATAL << "致命错误";
+
+// 方式二：使用 lg 命名空间或者命名空间别名 logger
+// 这种方式需要使用代理模式，会导致source_location失效，不推荐使用
+lg::debug() << "调试信息";
+lg::info() << "一般信息" << lg::endl << "下一行";
+lg::warning() << "警告信息";
+lg::error() << "错误信息";
+logger::info() << "一般信息";
+logger::error() << "错误信息";
+
+// 方式三：使用概念约束的简化版本
+log_info("Answer: ", 42, ", status: OK");
+...
 ```
 
 ---
@@ -167,7 +190,7 @@ YYYY-MM-DD HH:MM:SS [LEVEL] file:line - message
 
 ```bash
 # 直接编译
-g++ -std=c++20 main.cpp -o myapp
+g++ -I include -std=c++20 main.cpp -o myapp
 
 # 使用 CMake 构建
 mkdir build && cd build
