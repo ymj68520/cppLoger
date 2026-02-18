@@ -34,5 +34,6 @@
 
 .vscode
 .vs
-build
+build/
 lib/googletest/*
+app*
