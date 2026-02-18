@@ -1,5 +1,5 @@
-#ifndef LOGGER_HPP
-#define LOGGER_HPP
+#ifndef CPP_LOGGER_HPP
+#define CPP_LOGGER_HPP
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -8,6 +8,7 @@
 #include <mutex>
 #include <ctime>
 #include <iomanip>
+#include <atomic>
 
  /*
     * 日志级别枚举
@@ -15,8 +16,8 @@
     * INFO: 一般信息
     * WARNING: 警告信息
     * ERROR: 错误信息
-    * @author: zaoweiceng
-    * @date: 2025-03-28
+    * @author: ymj68520
+    * @date: 2026-02-18
     */
    enum LogLevel{
     DEBUG,
@@ -24,14 +25,14 @@
     WARNING,
     ERROR
 };
-LogLevel LogLevelFromString(const std::string& levelStr){
+inline LogLevel LogLevelFromString(const std::string& levelStr){
     if (levelStr == "DEBUG") return LogLevel::DEBUG;
     if (levelStr == "INFO") return LogLevel::INFO;
     if (levelStr == "WARNING") return LogLevel::WARNING;
     if (levelStr == "ERROR") return LogLevel::ERROR;
     return LogLevel::INFO;
 }
-std::string levelToString(LogLevel level) {
+inline std::string levelToString(LogLevel level) {
     switch (level) {
         case LogLevel::DEBUG:   return "DEBUG";
         case LogLevel::INFO:    return "INFO";
@@ -40,7 +41,7 @@ std::string levelToString(LogLevel level) {
         default:                return "UNKNOWN";
     }
 }
-std::string levelToStringConsole(LogLevel level) {
+inline std::string levelToStringConsole(LogLevel level) {
     switch (level) {
         case LogLevel::DEBUG:   return "\033[34mDEBUG\033[0m";   // Blue
         case LogLevel::INFO:    return "\033[32mINFO\033[0m";    // Green
@@ -49,7 +50,7 @@ std::string levelToStringConsole(LogLevel level) {
         default:                             return "UNKNOWN";  // Reset
     }
 }
-std::string getCurrentTime() {
+inline std::string getCurrentTime() {
     auto now = std::chrono::system_clock::now();
     auto time = std::chrono::system_clock::to_time_t(now);
     std::tm tm;
@@ -65,23 +66,28 @@ std::string getCurrentTime() {
     return ss.str();
 }
 
-std::string formatMessage(LogLevel level, const std::string& message, const std::string& file, int line) {
+inline std::string formatMessage(LogLevel level, const std::string& message, const std::string& file, int line) {
     std::stringstream ss;
     ss << getCurrentTime() << " [" << levelToString(level) << "] "
        << file << ":" << line << " - " << message;
     return ss.str();
 }
 
-std::string formatMessageConsole(LogLevel level, const std::string& message, const std::string& file, int line) {
+inline std::string formatMessageConsole(LogLevel level, const std::string& message, const std::string& file, int line) {
     std::stringstream ss;
     ss << getCurrentTime() << " [" << levelToStringConsole(level) << "] "
        << file << ":" << line << " - " << message;
     return ss.str();
 }
 
-std::string timeToString(const unsigned long long& time, const std::string& format){
+inline std::string timeToString(const unsigned long long& time, const std::string& format){
     std::time_t t = static_cast<std::time_t>(time);
-    std::tm tm = *std::localtime(&t);
+    std::tm tm;
+    #ifdef _WIN32
+    localtime_s(&tm, &t);
+    #else
+    localtime_r(&t, &tm);
+    #endif
     char buffer[80];
     std::strftime(buffer, sizeof(buffer), format.c_str(), &tm);
     return std::string(buffer);
@@ -90,8 +96,8 @@ std::string timeToString(const unsigned long long& time, const std::string& form
 /*
 * 日志类
 * 用于日志的输出
-* @author: zaoweiceng
-* @data: 2025-03-28
+* @author: ymj68520
+* @data: 2026-02-18
 */
 class Logger{
     public:
@@ -105,13 +111,12 @@ class Logger{
         // 设置日志级别
         // 传入日志级别
         void setLevel(LogLevel level){
-            std::lock_guard<std::mutex> lock(__mutex);
-            __level = level;
+            __level.store(level);
         }
         // 获取日志级别
         // 返回当前日志级别
         LogLevel getLevel() const{
-            return __level;
+            return __level.load();
         }
         // 设置日志输出方式
         // 传入是否输出到控制台
@@ -163,13 +168,7 @@ class Logger{
         // 互斥锁，用于文件输出的线程安全
         std::mutex __mutex;
         // 日志级别
-        LogLevel __level = [](const std::string& levelStr) {
-            if (levelStr == "DEBUG") return LogLevel::DEBUG;
-            if (levelStr == "INFO") return LogLevel::INFO;
-            if (levelStr == "WARNING") return LogLevel::WARNING;
-            if (levelStr == "ERROR") return LogLevel::ERROR;
-            return LogLevel::INFO;
-        }("INFO");
+        std::atomic<LogLevel> __level;
         // 是否输出到控制台
         bool __console = true;
         
